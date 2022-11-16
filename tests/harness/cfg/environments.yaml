@@ -1,0 +1,59 @@
+# This is a list of available ZenML deployments, either local or remote
+# (external), that can be included in test environments to be used to run
+# automated tests.
+# Local deployments are provisioned by the test framework on the fly in the test
+# preparation phase, and are torn down after the tests have finished. Remote
+# deployments are assumed to be already provisioned and ready to use.
+#
+# A deployment has the following properties:
+#
+# - name: The name of the deployment. This is used to refer to the deployment
+#   in test environments and in the test framework CLI. It is also used to
+#   generate unique names for resources that may need to be deployed locally.
+# - type: The deployment type. This can take one of the following values:
+#   -  local: A local deployment that doesn't use a ZenML server. Clients have
+#      to connect directly to a local database.
+#   -  server: A deployment that uses a ZenML server running either locally or
+#      remotely.
+# - deployment: The method used to deploy resources that need to be provisioned
+#   by the test framework. This is not included for ZenML servers that are
+#   installed and maintained externally. This can take one of the following
+#   values:
+#   -  default: Indicates that the default deployment method should be used. For
+#      `local` deployments, this means that the default SQLite database will be
+#      used. For `server` deployments, this is equivalent to deploying the
+#      default ZenML server with `zenml up`.
+#   -  docker: When used with a `local` deployment type, a MySQL database
+#      service container is provisioned locally and used instead of the default
+#      SQLite database. When used with a `server` deployment type, a local ZenML
+#      server is deployed, similar to running `zenml up --docker`. The test
+#      framework also takes care of building and using a `zenml-server` Docker
+#      image with the latest code available in the local zenml code repository
+#      clone.
+#   -  docker-compose: 
+deployments:
+  - name: default
+    type: local
+    deployment: default
+  - name: mysql-local
+    type: local
+    deployment: docker
+  - name: localhost
+    type: server
+    deployment: default
+  - name: docker-server
+    type: server
+    deployment: docker
+  - name: docker-compose-server
+    type: server
+    deployment: docker-compose
+  - name: aws-test-server
+    type: server
+    config:
+      url: https://zenml.internal.54.88.17.97.nip.io/
+      username: "{{ZENML_SERVER_AWS_USERNAME}}"
+      password: "{{ZENML_SERVER_AWS_PASSWORD}}"
+environments:
+  default:
+    server: default
+    

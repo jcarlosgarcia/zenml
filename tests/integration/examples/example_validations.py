@@ -17,34 +17,6 @@ from zenml.enums import ExecutionStatus
 from zenml.post_execution import get_pipeline
 
 
-def generate_basic_validation_function(
-    pipeline_name: str, step_count: int, run_count: int = 1
-):
-    """Generates a basic example validation function.
-
-    This function will make sure the runs of a specific pipeline succeeded by
-    checking the run status as well as making sure all steps were executed.
-
-    Args:
-        pipeline_name: The name of the pipeline to verify.
-        step_count: The amount of steps inside the pipeline.
-        run_count: The amount of pipeline runs to verify.
-
-    Raises:
-        AssertionError: If the validation failed.
-    """
-
-    def _validation_function():
-        """Basic validation of pipeline runs."""
-        pipeline = get_pipeline(pipeline_name)
-        assert pipeline
-
-        for run in pipeline.runs[-run_count:]:
-            assert run.status == ExecutionStatus.COMPLETED
-            assert len(run.steps) == step_count
-
-    return _validation_function
-
 
 def caching_example_validation():
     """Validates the stored pipeline run info after running the caching example."""

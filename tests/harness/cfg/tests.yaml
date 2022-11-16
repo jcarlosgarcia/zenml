@@ -1,0 +1,22 @@
+tests:
+  - name: evidently-example:
+    src: tests/examples
+    params:
+      example: evidently
+    requirements:
+      integrations:
+      packages:
+      components:
+        - type: data-validator
+          flavor: evidently
+
+test_suites:
+  - name: evidently-example
+    provision_user: true
+    provision_project: true
+    tests:
+      - evidently-example
+    environments:
+      - local
+      - local-docker-server
+      - aws
