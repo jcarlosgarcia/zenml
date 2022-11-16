@@ -15,6 +15,7 @@
 
 import os
 from functools import wraps
+from threading import get_ident
 from typing import Any, Callable, List, Optional, TypeVar, cast
 
 from fastapi import HTTPException
@@ -177,6 +178,7 @@ def handle_exceptions(func: F) -> F:
     @wraps(func)
     def decorated(*args: Any, **kwargs: Any) -> Any:
         try:
+            logger.debug(f"[{get_ident()}] Calling endpoint {func.__name__}")
             return func(*args, **kwargs)
         except NotAuthorizedError as error:
             logger.exception("Authorization error")
