@@ -55,48 +55,31 @@ def example_runner(examples_dir):
 @contextmanager
 def run_example(
     name: str,
-    tmp_path_factory: pytest.TempPathFactory,
-    client: str,
-    request: pytest.FixtureRequest,
-) -> Generator:
+) -> Generator[LocalExample, None, None]:
     """Runs the given examples and validates they ran correctly.
 
     Args:
         name: The name (=directory name) of the example
-        tmp_path_factory: Factory to generate temporary test paths.
     """
-
-    tmp_path = tmp_path_factory.mktemp("tmp")
 
     # Root directory of all checked out examples
     examples_directory = Path(__file__).parents[3] / "examples"
 
+    dst_dir = Path(os.getcwd()) / name
+    dst_dir.mkdir()
+
     # Copy all example files into the repository directory
-    copy_example_files(str(examples_directory / name), str(tmp_path))
+    copy_example_files(str(examples_directory / name), str(dst_dir))
 
     # Run the example
-    example = LocalExample(name=name, path=tmp_path)
+    example = LocalExample(name=name, path=dst_dir)
     example.run_example(
         example_runner(examples_directory),
         force=True,
         prevent_stack_setup=True,
     )
 
-    yield
-
-    # clean up
-    try:
-        shutil.rmtree(tmp_path)
-    except PermissionError:
-        # Windows does not have the concept of unlinking a file and deleting
-        # once all processes that are accessing the resource are done
-        # instead windows tries to delete immediately and fails with a
-        # PermissionError: [WinError 32] The process cannot access the
-        # file because it is being used by another process
-        logging.debug(
-            "Skipping deletion of temp dir at teardown, due to "
-            "Windows Permission error"
-        )
+    yield example
 
 
 def validate_pipeline_run(

@@ -12,7 +12,7 @@
 #  or implied. See the License for the specific language governing
 #  permissions and limitations under the License.
 
-from test_examples import run_example, validate_pipeline_run
+from .test_examples import run_example, validate_pipeline_run
 
 
 def test_example() -> None:
@@ -22,4 +22,8 @@ def test_example() -> None:
         tmp_path_factory: Factory to generate temporary test paths.
     """
     with run_example("kubeflow_pipelines_orchestration"):
-        validate_pipeline_run("mnist_pipeline")
+        validate_pipeline_run(
+            pipeline_name="mnist_pipeline",
+            step_count=4,
+            run_count=1,
+        )

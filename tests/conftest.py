@@ -24,6 +24,7 @@ import pytest
 from py._builtin import execfile
 from pytest_mock import MockerFixture
 
+from tests.harness.lib.config import Configuration
 from tests.venv_clone_utils import clone_virtualenv
 from zenml.artifact_stores.local_artifact_store import (
     LocalArtifactStore,
@@ -57,7 +58,107 @@ from zenml.zen_stores.base_zen_store import BaseZenStore
 from zenml.zen_stores.sql_zen_store import SqlZenStore, SqlZenStoreConfiguration
 
 
+DEFAULT_ENVIRONMENT_NAME = "default"
+
+
+def cleanup_folder(path: str):
+    """Deletes a folder and all its contents."""
+
+    if sys.platform == "win32":
+        try:
+            shutil.rmtree(path)
+        except PermissionError:
+            # Windows does not have the concept of unlinking a file and deleting
+            #  once all processes that are accessing the resource are done
+            #  instead windows tries to delete immediately and fails with a
+            #  PermissionError: [WinError 32] The process cannot access the
+            #  file because it is being used by another process
+            logging.debug(
+                "Skipping deletion of temp dir at teardown, due to "
+                "Windows Permission error"
+            )
+            # TODO[HIGH]: Implement fixture cleanup for Windows where
+            #  shutil.rmtree fails on files that are in use on python 3.7 and
+            #  3.8
+    else:
+        shutil.rmtree(path)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def environment(
+    session_mocker: MockerFixture,
+    request: pytest.FixtureRequest,
+):
+    """Fixture to deploy and use a test environment for all tests."""
+
+    # set env variables
+    os.environ[ENV_ZENML_DEBUG] = "true"
+    os.environ["ZENML_ANALYTICS_OPT_IN"] = "false"
+
+    session_mocker.patch("analytics.track")
+    session_mocker.patch("analytics.group")
+    session_mocker.patch("analytics.identify")
+
+    environment_name = request.config.getoption(
+        "environment", DEFAULT_ENVIRONMENT_NAME
+    )
+
+    # original working directory
+    orig_cwd = os.getcwd()
+
+    cfg = Configuration.load()
+    deployment_cfg = cfg.get_deployment_config(environment_name)
+    deployment = deployment_cfg.get_deployment()
+    deployment.up()
+
+    with deployment.connect() as client:
+        logging.info(
+            f"Test session is using test environment '{environment_name}' "
+            f"running at '{client.zen_store.url}'."
+        )
+        client.original_cwd = orig_cwd
+        yield client
+
+    no_teardown = request.config.getoption("no_teardown", False)
+
+    if not no_teardown:
+        deployment.cleanup()
+
+    # change working directory back to base path
+    os.chdir(orig_cwd)
+
+
 @pytest.fixture(scope="module", autouse=True)
+def clean_repo(
+    tmp_path_factory: pytest.TempPathFactory,
+    environment: Client,
+):
+    """Fixture to initialize and use a clean ZenML repository for all
+    tests in a module."""
+
+    # original working directory
+    orig_cwd = os.getcwd()
+
+    # change the working directory to a fresh temp path
+    tmp_path = tmp_path_factory.mktemp("tmp")
+    os.chdir(tmp_path)
+
+    environment.initialize(tmp_path)
+    environment.activate_root(tmp_path)
+
+    logging.info(f"Tests are running in clean repository: '{tmp_path}'")
+
+    # monkey patch original cwd in for later use and yield
+    environment.original_cwd = orig_cwd
+    yield environment
+
+    # remove all traces, and change working directory back to base path
+    os.chdir(orig_cwd)
+    environment.activate_root(Path(orig_cwd))
+    cleanup_folder(tmp_path)
+
+
+@pytest.fixture(scope="module")  # , autouse=True)
 def base_client(
     tmp_path_factory: pytest.TempPathFactory,
     session_mocker: MockerFixture,
@@ -68,10 +169,6 @@ def base_client(
 
     # original working directory
     orig_cwd = os.getcwd()
-
-    # set env variables
-    os.environ[ENV_ZENML_DEBUG] = "true"
-    os.environ["ZENML_ANALYTICS_OPT_IN"] = "false"
 
     # change the working directory to a fresh temp path
     tmp_path = tmp_path_factory.mktemp("tmp")
@@ -84,10 +181,6 @@ def base_client(
     # configuration and the local stacks used during testing are separate from
     # those used in the current environment
     os.environ["ZENML_CONFIG_PATH"] = str(tmp_path / "zenml")
-
-    session_mocker.patch("analytics.track")
-    session_mocker.patch("analytics.group")
-    session_mocker.patch("analytics.identify")
 
     # initialize global config, repo and zen store at the new path
     GlobalConfiguration()
@@ -741,50 +834,28 @@ def virtualenv(
 
 def pytest_addoption(parser):
     """Fixture that gets called by pytest ahead of tests. Adds the following cli
-    option:
+    options:
 
-        * an option to enable kubeflow for integration tests
-        * an option to disable the use of the virtualenv fixture. This might be
-        useful for local integration testing in case you do not care about your
-        base environment being affected
-        * an option to use a specific secrets manager flavor in the secrets
-        manager integration tests
+        --environment <environment_name>: Use a test environment with the
+            given name to run tests against. If no environment is specified,
+            each tests module will run in its own temporary local default
+            environment.
+        --no-teardown: Do not tear down the test environment after tests
+            have run.
 
     How to use this option:
 
-        ```pytest tests/integration/test_examples.py --on-kubeflow```
-
-        ```pytest tests/integration/test_examples.py --use-virtualenv```
-
-        ```pytest tests/integration/test_examples.py --secrets-manager-flavor aws```
-
+        ```pytest tests/integration --environment <environment_name>```
     """
     parser.addoption(
-        "--on-kubeflow",
-        action="store_true",
-        default=False,
-        help="Only run Kubeflow",
-    )
-    parser.addoption(
-        "--use-virtualenv",
-        action="store_true",
-        default=False,
-        help="Run Integration tests in cloned env",
-    )
-    parser.addoption(
-        "--secrets-manager-flavor",
+        "--environment",
         action="store",
-        default="local",
-        help="The flavor of secrets manager to use (local, aws, etc)",
+        default=DEFAULT_ENVIRONMENT_NAME,
+        help="Environment to run tests against",
     )
-
-
-def pytest_generate_tests(metafunc):
-    """Parametrizes the repo_fixture_name wherever it is imported by a step with
-    the cli options."""
-    if "repo_fixture_name" in metafunc.fixturenames:
-        if metafunc.config.getoption("on_kubeflow"):
-            repos = ["clean_kubeflow_repo"]
-        else:
-            repos = ["clean_client"]
-        metafunc.parametrize("repo_fixture_name", repos)
+    parser.addoption(
+        "--no-teardown",
+        action="store_true",
+        default=False,
+        help="Do not tear down the test environment after tests have run.",
+    )
