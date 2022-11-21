@@ -1,0 +1,113 @@
+tests:
+
+  - module: tests.integration.examples.test_airflow_orchestration
+    requirements:
+      integrations: []
+      packages: []
+      stacks: []
+
+  - module: tests.integration.examples.test_cloud_secrets_manager
+    requirements:
+      integrations: []
+      packages: []
+      stacks:
+        - type: secrets_manager
+
+
+  - module: tests.integration.examples.test_deepchecks_data_validation
+    requirements:
+      integrations:
+        - sklearn
+      packages: []
+      stacks:
+        - type: data-validator
+          flavor: deepchecks
+
+  - module: tests.integration.examples.test_evidently_drift_detection
+    requirements:
+      integrations:
+        - sklearn
+      packages: []
+      stacks:
+        - type: data-validator
+          flavor: evidently
+
+  - module: tests.integration.examples.test_facets_visualize_statistics
+    requirements:
+      integrations:
+        - facets
+        - tensorflow
+      packages: []
+      stacks: []
+
+
+  - module: tests.integration.examples.test_great_expectations_data_validation
+    requirements:
+      integrations:
+        - sklearn
+      packages: []
+      stacks:
+        - type: data-validator
+          flavor: great_expectations
+
+  - module: tests.integration.examples.test_kubeflow_pipelines_orchestration
+    requirements:
+      integrations:
+        - tensorflow
+        - tensorboard
+      packages: []
+      stacks: []
+
+  - module: tests.integration.examples.test_kubernetes_orchestration
+    requirements:
+      integrations:
+        - sklearn
+      packages: []
+      stacks: []
+
+  - module: tests.integration.examples.test_lightgbm
+    requirements:
+      integrations:
+        - lightgbm
+      packages: []
+      stacks: []
+
+  - module: tests.integration.examples.test_mlflow_tracking
+    requirements:
+      integrations:
+        - tensorflow
+      packages: []
+      stacks:
+        - type: experiment_tracker
+          flavor: mlflow
+
+  - module: tests.integration.examples.test_neural_prophet
+    requirements:
+      integrations:
+        - neural_prophet
+      packages: []
+      stacks: []
+
+  - module: tests.integration.examples.test_pytorch
+    requirements:
+      integrations:
+        - pytorch
+      packages:
+        - torchvision
+      stacks: []
+
+  - module: tests.integration.examples.test_whylogs_data_profiling
+    requirements:
+      integrations:
+        - sklearn
+      packages: []
+      stacks:
+        - type: data-validator
+          flavor: whylogs
+
+  - module: tests.integration.examples.test_xgboost
+    requirements:
+      integrations:
+        - xgboost
+      packages: []
+      stacks: []

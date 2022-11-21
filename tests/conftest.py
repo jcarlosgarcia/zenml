@@ -1,4 +1,4 @@
-#  Copyright (c) ZenML GmbH 2021. All Rights Reserved.
+#  Copyright (c) ZenML GmbH 2022. All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -18,13 +18,17 @@ import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
+from types import ModuleType
+from typing import Generator, List
 from uuid import uuid4
 
 import pytest
+import _pytest.config
 from py._builtin import execfile
 from pytest_mock import MockerFixture
 
 from tests.harness.lib.config import Configuration
+
 from tests.venv_clone_utils import clone_virtualenv
 from zenml.artifact_stores.local_artifact_store import (
     LocalArtifactStore,
@@ -88,8 +92,12 @@ def cleanup_folder(path: str):
 def environment(
     session_mocker: MockerFixture,
     request: pytest.FixtureRequest,
-):
-    """Fixture to deploy and use a test environment for all tests."""
+) -> Generator[Client, None, None]:
+    """Fixture to deploy and use a test environment for all tests.
+
+    Yields:
+        A ZenML client connected to the test environment.
+    """
 
     # set env variables
     os.environ[ENV_ZENML_DEBUG] = "true"
@@ -122,10 +130,55 @@ def environment(
     no_teardown = request.config.getoption("no_teardown", False)
 
     if not no_teardown:
+        logging.info(f"Tearing down test environment '{environment_name}'.")
         deployment.cleanup()
 
     # change working directory back to base path
     os.chdir(orig_cwd)
+
+
+@pytest.fixture(scope="module", autouse=True)
+def setup_requirements(
+    environment: Client,
+    request: pytest.FixtureRequest,
+) -> Generator[Stack, None, None]:
+    """Fixture to check test-level requirements and configure stacks for each test module.
+
+    Yields:
+        An active ZenML stack with the requirements of the test module.
+    """
+    cfg = Configuration.load()
+    result, msg = cfg.check_requirements(
+        module=request.module, client=environment
+    )
+    if not result:
+        pytest.skip(msg=f"Requirements not met: {msg}")
+
+    yield from cfg.setup_test_stack(module=request.module, client=environment)
+
+
+# def pytest_collection_modifyitems(
+#     session: pytest.Session,
+#     config: _pytest.config.Config,
+#     items: List[pytest.Item],
+# ) -> None:
+#     cfg = Configuration.load()
+#     environment_name = config.getoption("environment", DEFAULT_ENVIRONMENT_NAME)
+
+#     deployment_cfg = cfg.get_deployment_config(environment_name)
+#     deployment = deployment_cfg.get_deployment()
+#     deployment.up()
+
+#     with deployment.connect() as client:
+
+#         # modules: List[ModuleType] = []
+#         for item in items:
+#             # modules.append(item.module)
+#             result, msg = cfg.check_requirements(item.module, client)
+#             if not result:
+#                 item.add_marker(
+#                     pytest.mark.skip(reason=f"Requirements not met: {msg}")
+#                 )
 
 
 @pytest.fixture(scope="module", autouse=True)
