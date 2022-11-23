@@ -11,15 +11,6 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 #  or implied. See the License for the specific language governing
 #  permissions and limitations under the License.
-
-from .utils import run_example, validate_pipeline_run
-
-
-def test_example() -> None:
-    """Runs the airflow_orchestration example."""
-    with run_example("airflow_orchestration"):
-        validate_pipeline_run(
-            pipeline_name="fashion_mnist_pipeline",
-            step_count=3,
-            run_count=1,
-        )
+import tests.harness.cli.cli
+import tests.harness.cli.deployment
+import tests.harness.cli.environment

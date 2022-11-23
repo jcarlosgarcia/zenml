@@ -1,5 +1,25 @@
-# 
+# Environments couple together a deployment with an optional set of
+# requirements to be configured on the deployment. The deployment entry
+# can be a reference to a global deployment entry by name or an inline
+# deployment configuration. Same for the requirements: they can be
+# specified either inline using the same format as the global requirements
+# file or by referencing a global requirements entry by name.
+#
 environments:
-  default:
-    server: default
-    
+  - name: default
+    deployment: default
+  - name: local
+    deployment: default
+    requirements:
+      - data-validators
+      - mlflow-local-tracker
+      - mlflow-local-deployer
+      - local-secrets-manager
+  - name: local-kubeflow
+    deployment: default
+    requirements:
+      - data-validators
+      - kubeflow-local
+      - mlflow-local-tracker
+      - mlflow-local-deployer
+      - local-secrets-manager

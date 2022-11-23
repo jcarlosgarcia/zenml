@@ -54,11 +54,13 @@ def example_runner(examples_dir):
 @contextmanager
 def run_example(
     name: str,
+    *args: str,
 ) -> Generator[LocalExample, None, None]:
     """Runs the given examples and validates they ran correctly.
 
     Args:
         name: The name (=directory name) of the example
+        *args: Additional arguments to pass to the example
     """
 
     # Root directory of all checked out examples
@@ -72,11 +74,7 @@ def run_example(
 
     # Run the example
     example = LocalExample(name=name, path=dst_dir)
-    example.run_example(
-        example_runner(examples_directory),
-        force=True,
-        prevent_stack_setup=True,
-    )
+    example.run_example_directly(*args)
 
     yield example
 

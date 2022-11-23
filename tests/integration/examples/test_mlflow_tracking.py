@@ -27,7 +27,7 @@ def test_example() -> None:
         MLFlowExperimentTracker,
     )
 
-    with run_example("airflow_orchestration"):
+    with run_example("mlflow_tracking"):
         pipeline = get_pipeline("mlflow_example_pipeline")
         assert pipeline
 

@@ -19,15 +19,16 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 from types import ModuleType
-from typing import Generator, List
+from typing import Generator, List, Tuple
 from uuid import uuid4
 
 import pytest
-import _pytest.config
 from py._builtin import execfile
 from pytest_mock import MockerFixture
+from tests.harness.environment import TestEnvironment
+from tests.harness.harness import TestHarness
 
-from tests.harness.lib.config import Configuration
+from tests.harness.harness import TestHarness
 
 from tests.venv_clone_utils import clone_virtualenv
 from zenml.artifact_stores.local_artifact_store import (
@@ -92,11 +93,11 @@ def cleanup_folder(path: str):
 def environment(
     session_mocker: MockerFixture,
     request: pytest.FixtureRequest,
-) -> Generator[Client, None, None]:
-    """Fixture to deploy and use a test environment for all tests.
+) -> Generator[Tuple[TestEnvironment, Client], None, None]:
+    """Fixture to provision and use a test environment for all tests.
 
     Yields:
-        A ZenML client connected to the test environment.
+        The active environment and a client connected with it.
     """
 
     # set env variables
@@ -107,54 +108,51 @@ def environment(
     session_mocker.patch("analytics.group")
     session_mocker.patch("analytics.identify")
 
-    environment_name = request.config.getoption(
-        "environment", DEFAULT_ENVIRONMENT_NAME
-    )
-
     # original working directory
     orig_cwd = os.getcwd()
 
-    cfg = Configuration.load()
-    deployment_cfg = cfg.get_deployment_config(environment_name)
-    deployment = deployment_cfg.get_deployment()
-    deployment.up()
+    harness = TestHarness()
 
-    with deployment.connect() as client:
+    environment_name = request.config.getoption("environment", None)
+    no_teardown = request.config.getoption("no_teardown", False)
+    no_stack_cleanup = request.config.getoption("no_stack_cleanup", False)
+
+    if environment_name is None:
+        # If no environment is specified, create an ad-hoc environment
+        # consisting of the supplied deployment (or the default one) and
+        # the supplied test requirements (if present).
+        deployment_name = request.config.getoption(
+            "deployment", DEFAULT_ENVIRONMENT_NAME
+        )
+        requirements_names = request.config.getoption("requirements")
+
+        environment = harness.set_environment(
+            deployment_name=deployment_name,
+            requirements_names=requirements_names.split(",")
+            if requirements_names
+            else [],
+        )
+    else:
+        environment = harness.set_environment(
+            environment_name=environment_name,
+        )
+
+    # Provision the environment (bring up the deployment, if local, and
+    # register the stacks according to the environment's configuration)
+    with environment.setup(
+        tear_down=not no_teardown,
+        cleanup_stacks=not no_stack_cleanup,
+    ) as client:
         logging.info(
-            f"Test session is using test environment '{environment_name}' "
+            f"Test session is using environment '{environment.config.name}' "
             f"running at '{client.zen_store.url}'."
         )
+
         client.original_cwd = orig_cwd
-        yield client
-
-    no_teardown = request.config.getoption("no_teardown", False)
-
-    if not no_teardown:
-        logging.info(f"Tearing down test environment '{environment_name}'.")
-        deployment.cleanup()
+        yield environment, client
 
     # change working directory back to base path
     os.chdir(orig_cwd)
-
-
-@pytest.fixture(scope="module", autouse=True)
-def setup_requirements(
-    environment: Client,
-    request: pytest.FixtureRequest,
-) -> Generator[Stack, None, None]:
-    """Fixture to check test-level requirements and configure stacks for each test module.
-
-    Yields:
-        An active ZenML stack with the requirements of the test module.
-    """
-    cfg = Configuration.load()
-    result, msg = cfg.check_requirements(
-        module=request.module, client=environment
-    )
-    if not result:
-        pytest.skip(msg=f"Requirements not met: {msg}")
-
-    yield from cfg.setup_test_stack(module=request.module, client=environment)
 
 
 # def pytest_collection_modifyitems(
@@ -184,7 +182,7 @@ def setup_requirements(
 @pytest.fixture(scope="module", autouse=True)
 def clean_repo(
     tmp_path_factory: pytest.TempPathFactory,
-    environment: Client,
+    environment: Tuple[TestEnvironment, Client],
 ):
     """Fixture to initialize and use a clean ZenML repository for all
     tests in a module."""
@@ -196,19 +194,49 @@ def clean_repo(
     tmp_path = tmp_path_factory.mktemp("tmp")
     os.chdir(tmp_path)
 
-    environment.initialize(tmp_path)
-    environment.activate_root(tmp_path)
+    _, client = environment
+
+    client.initialize(tmp_path)
+    client.activate_root(tmp_path)
 
     logging.info(f"Tests are running in clean repository: '{tmp_path}'")
 
     # monkey patch original cwd in for later use and yield
-    environment.original_cwd = orig_cwd
-    yield environment
+    client.original_cwd = orig_cwd
+    yield client
 
     # remove all traces, and change working directory back to base path
     os.chdir(orig_cwd)
-    environment.activate_root(Path(orig_cwd))
+    client.activate_root(Path(orig_cwd))
     cleanup_folder(tmp_path)
+
+
+@pytest.fixture(scope="module", autouse=True)
+def setup_requirements(
+    clean_repo: Client,
+    request: pytest.FixtureRequest,
+) -> Generator[Stack, None, None]:
+    """Fixture to check test-level requirements and configure stacks for each test module.
+
+    Yields:
+        An active ZenML stack with the requirements of the test module.
+    """
+    harness = TestHarness()
+    result, msg = harness.check_requirements(
+        module=request.module,
+        client=clean_repo,
+    )
+    if not result:
+        pytest.skip(msg=f"Requirements not met: {msg}")
+
+    no_cleanup = request.config.getoption("no_stack_cleanup", False)
+
+    with harness.setup_test_stack(
+        module=request.module,
+        client=clean_repo,
+        cleanup=not no_cleanup,
+    ) as stack:
+        yield stack
 
 
 @pytest.fixture(scope="module")  # , autouse=True)
@@ -903,12 +931,30 @@ def pytest_addoption(parser):
     parser.addoption(
         "--environment",
         action="store",
-        default=DEFAULT_ENVIRONMENT_NAME,
+        default=None,
         help="Environment to run tests against",
+    )
+    parser.addoption(
+        "--deployment",
+        action="store",
+        default=None,
+        help="Deployment to run tests against",
+    )
+    parser.addoption(
+        "--requirements",
+        action="store",
+        default=None,
+        help="Global test requirements to run tests against",
     )
     parser.addoption(
         "--no-teardown",
         action="store_true",
         default=False,
         help="Do not tear down the test environment after tests have run.",
+    )
+    parser.addoption(
+        "--no-stack-cleanup",
+        action="store_true",
+        default=False,
+        help="Do not cleanup the test stacks after tests have run.",
     )

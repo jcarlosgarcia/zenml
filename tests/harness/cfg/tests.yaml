@@ -1,113 +1,128 @@
+# Test configurations specify which requirements are needed for the test to run.
+# These requirements refer to both software packages and ZenML stack components.
+#
+# Each entry must point to the pytest module or package that contains the test
+# code and specify a list of requirements that are needed for the test to run.
+# The requirements can be specified either inline using the same format as the
+# global requirements file or by referencing a global requirements entry by
+# name.
+#
+# Note that the integrations, packages and system tools requirements are not
+# installed automatically. The user is expected to install them in the host OS
+# and/or current virtual environment. The test framework only checks for their
+# presence and skips the test if they are not installed.
+#
+# Example:
+#
+#  ```
+#  tests:
+#    - module: tests.integration.example.module
+#      requirements:
+#        - global_requirement_name
+#        - integrations:
+#            - pytorch
+#            - xgboost
+#          packages:
+#            - numpy==1.19.5
+#            - pandas
+#          system_tools:
+#            - docker
+#            - kubectl
+#          system_os:
+#            - linux
+#            - macos
+#          stacks:
+#            - type: experiment_tracker
+#              flavor: mlflow
+#              configuration:
+#                nested: true
+#            - type: model_deployer
+#              flavor: seldon
+#  ```
 tests:
-
-  - module: tests.integration.examples.test_airflow_orchestration
-    requirements:
-      integrations: []
-      packages: []
-      stacks: []
 
   - module: tests.integration.examples.test_cloud_secrets_manager
     requirements:
-      integrations: []
-      packages: []
-      stacks:
-        - type: secrets_manager
-
+      - integrations: []
+        packages: []
+        stacks:
+          - type: secrets_manager
 
   - module: tests.integration.examples.test_deepchecks_data_validation
     requirements:
-      integrations:
-        - sklearn
-      packages: []
-      stacks:
-        - type: data-validator
-          flavor: deepchecks
+      - integrations:
+          - sklearn
+        stacks:
+          - type: data_validator
+            flavor: deepchecks
 
   - module: tests.integration.examples.test_evidently_drift_detection
     requirements:
-      integrations:
-        - sklearn
-      packages: []
-      stacks:
-        - type: data-validator
-          flavor: evidently
+      - integrations:
+          - sklearn
+        stacks:
+          - type: data_validator
+            flavor: evidently
 
   - module: tests.integration.examples.test_facets_visualize_statistics
     requirements:
-      integrations:
-        - facets
-        - tensorflow
-      packages: []
-      stacks: []
-
+      - integrations:
+          - facets
+          - tensorflow
 
   - module: tests.integration.examples.test_great_expectations_data_validation
     requirements:
-      integrations:
-        - sklearn
-      packages: []
-      stacks:
-        - type: data-validator
-          flavor: great_expectations
+      - integrations:
+          - sklearn
+        stacks:
+          - type: data_validator
+            flavor: great_expectations
 
   - module: tests.integration.examples.test_kubeflow_pipelines_orchestration
     requirements:
-      integrations:
-        - tensorflow
-        - tensorboard
-      packages: []
-      stacks: []
+      - integrations:
+          - tensorflow
+          - tensorboard
 
   - module: tests.integration.examples.test_kubernetes_orchestration
     requirements:
-      integrations:
-        - sklearn
-      packages: []
-      stacks: []
+      - integrations:
+          - sklearn
 
   - module: tests.integration.examples.test_lightgbm
     requirements:
-      integrations:
-        - lightgbm
-      packages: []
-      stacks: []
+      - integrations:
+          - lightgbm
 
   - module: tests.integration.examples.test_mlflow_tracking
     requirements:
-      integrations:
-        - tensorflow
-      packages: []
-      stacks:
-        - type: experiment_tracker
-          flavor: mlflow
+      - integrations:
+          - tensorflow
+        stacks:
+          - type: experiment_tracker
+            flavor: mlflow
 
   - module: tests.integration.examples.test_neural_prophet
     requirements:
-      integrations:
-        - neural_prophet
-      packages: []
-      stacks: []
+      - integrations:
+          - neural_prophet
 
   - module: tests.integration.examples.test_pytorch
     requirements:
-      integrations:
-        - pytorch
-      packages:
-        - torchvision
-      stacks: []
+      - integrations:
+          - pytorch
+        packages:
+          - torchvision
 
   - module: tests.integration.examples.test_whylogs_data_profiling
     requirements:
-      integrations:
-        - sklearn
-      packages: []
-      stacks:
-        - type: data-validator
-          flavor: whylogs
+      - integrations:
+          - sklearn
+        stacks:
+          - type: data_validator
+            flavor: whylogs
 
   - module: tests.integration.examples.test_xgboost
     requirements:
-      integrations:
-        - xgboost
-      packages: []
-      stacks: []
+      - integrations:
+          - xgboost

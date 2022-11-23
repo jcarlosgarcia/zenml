@@ -12,14 +12,9 @@
 #  or implied. See the License for the specific language governing
 #  permissions and limitations under the License.
 
-from .utils import run_example, validate_pipeline_run
+import click
 
 
-def test_example() -> None:
-    """Runs the airflow_orchestration example."""
-    with run_example("airflow_orchestration"):
-        validate_pipeline_run(
-            pipeline_name="fashion_mnist_pipeline",
-            step_count=3,
-            run_count=1,
-        )
+@click.group
+def cli() -> None:
+    """CLI base command for the ZenML test framework."""

@@ -29,7 +29,7 @@ def test_example() -> None:
 
         run = pipeline.runs[-1]
         assert run.status == ExecutionStatus.COMPLETED
-        assert len(run.steps) == 3
+        assert len(run.steps) == 4
 
         # Final step should have output a data drift report
         drift_detection_step = run.get_step("drift_detector")

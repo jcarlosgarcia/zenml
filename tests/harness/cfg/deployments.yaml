@@ -1,5 +1,7 @@
-# This is a list of ZenML deployments, either local or remote (external), that
-# can be included in test environments to be used to run automated tests.
+# A list of ZenML deployments, either local or remote (external), that
+# can be included in test environments to be used to run automated tests or
+# passed to pytest directly using the `--deployment` command line argument.
+#
 # Local deployments are provisioned by the test framework on the fly in the test
 # preparation phase, and are torn down after the tests have finished. Remote
 # deployments are assumed to be already provisioned and ready to use.
@@ -33,6 +35,13 @@
 #   -  external: A 3rd party ZenML server that is installed and maintained
 #      externally. The test framework will not provision or manage this server.
 #      The test framework will only connect to the server and run tests against
+#      it. A `config` section must be provided in the deployment configuration
+#      to specify the connection details.
+# - config: A dictionary of configuration parameters that are used to initialize
+#   the ZenML store to connect to a remote ZenML server or database. The values
+#   may reference secrets that are defined in the test configuration or as
+#   environment variables using the `{{SECRET_NAME_OR_ENV_VAR}}` syntax.
+#
 deployments:
   - name: default
     type: local
